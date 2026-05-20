@@ -6,7 +6,7 @@ const details = () => ({
   Type: 'Video',
   Operation: 'Transcode',
   Description: 'Identify any unwanted image formats in the file and remove those streams. MJPEG, PNG & GIF \n\n',
-  Version: '1.4',
+  Version: '1.5',
   Tags: 'pre-processing,ffmpeg,video only',
   Inputs: [],
 });
@@ -42,12 +42,23 @@ const plugin = (file, librarySettings, inputs, otherArguments) => {
   for (let i = 0; i < file.ffProbeData.streams.length; i++) {
     // Check if stream is video.
     if (file.ffProbeData.streams[i].codec_type.toLowerCase() === 'video') {
-      // Check if stream codec is mjpeg, png or gif. Remove if so.
-      if (
-        file.ffProbeData.streams[i].codec_name === 'mjpeg'
-        || file.ffProbeData.streams[i].codec_name === 'png'
-        || file.ffProbeData.streams[i].codec_name === 'gif'
-      ) {
+      const stream = file.ffProbeData.streams[i];
+      const isImageCodec = stream.codec_name === 'mjpeg'
+        || stream.codec_name === 'png'
+        || stream.codec_name === 'gif';
+      const hasImageTag = (stream.tags && (
+        stream.tags.MIMETYPE
+        || (stream.tags.FILENAME && stream.tags.FILENAME.match(/\.(png|jpg|jpeg|gif|bmp|webp)$/i))
+      ));
+      const hasZeroDuration = stream.duration === '0'
+        || stream.duration === '0.0'
+        || stream.duration === '0.000000000'
+        || stream.duration === 0
+        || stream.duration === '00:00:00.000000000';
+      const isCoverArt = isImageCodec
+        || (videoIdx > 0
+          && (hasImageTag || (hasZeroDuration && stream.width && stream.width < 500)));
+      if (isCoverArt) {
         convert = true;
         extraArguments += `-map -v:${videoIdx} `;
       }
