@@ -35,6 +35,7 @@ var details = function () { return ({
                     'mjpeg',
                     'flv',
                     'theora',
+                    'vvc',
                 ],
             },
             tooltip: 'Specify the codec check for',
