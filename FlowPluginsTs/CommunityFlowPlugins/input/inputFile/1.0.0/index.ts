@@ -1,11 +1,11 @@
-import { promises as fs } from 'fs';
+import { promises as fsp } from 'fs';
 
 import {
   IpluginDetails,
   IpluginInputArgs,
   IpluginOutputArgs,
 } from '../../../../FlowHelpers/1.0.0/interfaces/interfaces';
-import { getFileAbosluteDir } from '../../../../FlowHelpers/1.0.0/fileUtils';
+import { getFileAbsoluteDir } from '../../../../FlowHelpers/1.0.0/fileUtils';
 
 /* eslint no-plusplus: ["error", { "allowForLoopAfterthoughts": true }] */
 const details = (): IpluginDetails => ({
@@ -22,28 +22,22 @@ const details = (): IpluginDetails => ({
   icon: '',
   inputs: [
     {
+      label: 'File Access Checks',
       name: 'fileAccessChecks',
       type: 'boolean',
       defaultValue: 'false',
       inputUI: {
-        type: 'dropdown',
-        options: [
-          'false',
-          'true',
-        ],
+        type: 'switch',
       },
       tooltip: 'Will check if input file and cache are readable and writable',
     },
     {
+      label: 'Pause Node If Access Checks Fail',
       name: 'pauseNodeIfAccessChecksFail',
       type: 'boolean',
       defaultValue: 'false',
       inputUI: {
-        type: 'dropdown',
-        options: [
-          'false',
-          'true',
-        ],
+        type: 'switch',
       },
       tooltip: 'This will pause the node if the file access checks fail',
     },
@@ -62,11 +56,11 @@ const plugin = async (args: IpluginInputArgs): Promise<IpluginOutputArgs> => {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars,no-param-reassign
   args.inputs = lib.loadDefaultValues(args.inputs, details);
 
-  const orignalFolder = getFileAbosluteDir(args.originalLibraryFile._id);
+  const orignalFolder = getFileAbsoluteDir(args.originalLibraryFile._id);
   const { fileAccessChecks, pauseNodeIfAccessChecksFail } = args.inputs;
 
   const nodeID = process.argv[8];
-  const { serverIP, serverPort } = args.deps.configVars.config;
+  const { serverIP, serverPort, apiKey } = args.deps.configVars.config;
 
   const url = `http://${serverIP}:${serverPort}/api/v2/update-node`;
 
@@ -75,7 +69,9 @@ const plugin = async (args: IpluginInputArgs): Promise<IpluginOutputArgs> => {
     const requestConfig = {
       method: 'post',
       url,
-      headers: {},
+      headers: {
+        'x-api-key': apiKey,
+      },
       data: {
         data: {
           nodeID,
@@ -92,7 +88,9 @@ const plugin = async (args: IpluginInputArgs): Promise<IpluginOutputArgs> => {
 
   const checkReadWrite = async (location: string) => {
     try {
-      await fs.access(location, fs.constants.R_OK);
+      args.jobLog(`Checking read access for: "${location}"`);
+      await fsp.access(location, fsp.constants.R_OK);
+      args.jobLog('Read access OK');
     } catch (err) {
       args.jobLog(JSON.stringify(err));
       if (pauseNodeIfAccessChecksFail) {
@@ -103,7 +101,7 @@ const plugin = async (args: IpluginInputArgs): Promise<IpluginOutputArgs> => {
     }
 
     try {
-      await fs.access(location, fs.constants.W_OK);
+      await fsp.access(location, fsp.constants.W_OK);
     } catch (err) {
       args.jobLog(JSON.stringify(err));
       if (pauseNodeIfAccessChecksFail) {
@@ -113,7 +111,9 @@ const plugin = async (args: IpluginInputArgs): Promise<IpluginOutputArgs> => {
     }
   };
 
-  if (fileAccessChecks) {
+  const isNotUnmappedNode = args?.configVars?.config?.nodeType !== 'unmapped';
+
+  if (fileAccessChecks && isNotUnmappedNode) {
     args.jobLog('Checking file access');
     await checkReadWrite(orignalFolder);
     await checkReadWrite(args.librarySettings.cache);

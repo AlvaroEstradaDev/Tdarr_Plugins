@@ -21,6 +21,7 @@ const details = (): IpluginDetails => ({
   icon: '',
   inputs: [
     {
+      label: 'Plugin Source ID',
       name: 'pluginSourceId',
       type: 'string',
       defaultValue: 'Community:Tdarr_Plugin_MC93_Migz1FFMPEG',
@@ -181,6 +182,7 @@ const plugin = async (args: IpluginInputArgs): Promise<IpluginOutputArgs> => {
     inputFileObj: args.inputFileObj,
     logFullCliOutput: args.logFullCliOutput,
     updateWorker: args.updateWorker,
+    args,
   });
 
   const res = await cli.runCli();

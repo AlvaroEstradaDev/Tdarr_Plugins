@@ -122,6 +122,13 @@ module.exports.plugin = plugin;`;
       errorEncountered = true;
     }
 
+    console.log(files[i]);
+    // check if words in pluginDetails.Name are not capitalized
+    if (pluginDetails.Name.split(' ').some((word) => word[0] !== word[0].toUpperCase())) {
+      console.log(chalk.red(`Plugin Name is not capitalized '${folder}/${files[i]}'`));
+      errorEncountered = true;
+    }
+
     if (!['Pre-processing', 'Post-processing'].includes(pluginDetails.Stage)) {
       console.log(chalk.red(`Plugin does not have a valid Type'${folder}/${files[i]}'`));
       errorEncountered = true;
@@ -191,6 +198,14 @@ module.exports.plugin = plugin;`;
           errorEncountered = true;
         } else if (Array.isArray(inputs[j].inputUI.options) && inputs[j].inputUI.options.some((option) => typeof option === 'boolean')) {
           console.log(chalk.red(`Plugin Input has a boolean dropdown input: '${folder}/${files[i]}' : ${inputs[j].name}`));
+          errorEncountered = true;
+        } else if (
+          inputs[j].type === 'boolean'
+          && inputs[j].inputUI.type === 'dropdown'
+          && Array.isArray(inputs[j].inputUI.options)
+          && String(inputs[j].defaultValue) !== String(inputs[j].inputUI.options[0])
+        ) {
+          console.log(chalk.red(`Plugin Input boolean dropdown defaultValue does not match first option: '${folder}/${files[i]}' : ${inputs[j].name}`));
           errorEncountered = true;
         }
 

@@ -1,3 +1,5 @@
+import { getFfType } from '../../../../FlowHelpers/1.0.0/fileUtils';
+import { checkFfmpegCommandInit } from '../../../../FlowHelpers/1.0.0/interfaces/flowUtils';
 import {
   IffmpegCommandStream,
   IpluginDetails,
@@ -20,6 +22,7 @@ const details = (): IpluginDetails => ({
   icon: '',
   inputs: [
     {
+      label: 'Audio Encoder',
       name: 'audioEncoder',
       type: 'string',
       defaultValue: 'aac',
@@ -41,6 +44,7 @@ const details = (): IpluginDetails => ({
         'Enter the desired audio codec',
     },
     {
+      label: 'Language',
       name: 'language',
       type: 'string',
       defaultValue: 'en',
@@ -52,6 +56,7 @@ const details = (): IpluginDetails => ({
         + ' Case-insensitive. One tag only',
     },
     {
+      label: 'Channels',
       name: 'channels',
       type: 'number',
       defaultValue: '2',
@@ -66,6 +71,80 @@ const details = (): IpluginDetails => ({
       },
       tooltip:
         'Enter the desired number of channels',
+    },
+    {
+      label: 'Enable Bitrate',
+      name: 'enableBitrate',
+      type: 'boolean',
+      defaultValue: 'false',
+      inputUI: {
+        type: 'switch',
+      },
+      tooltip:
+        'Toggle whether to enable setting audio bitrate',
+    },
+    {
+      label: 'Bitrate',
+      name: 'bitrate',
+      type: 'string',
+      defaultValue: '128k',
+      inputUI: {
+        type: 'text',
+        displayConditions: {
+          logic: 'AND',
+          sets: [
+            {
+              logic: 'AND',
+              inputs: [
+                {
+                  name: 'enableBitrate',
+                  value: 'true',
+                  condition: '===',
+                },
+              ],
+            },
+          ],
+        },
+      },
+      tooltip:
+        'Specify the audio bitrate for newly added channels',
+    },
+    {
+      label: 'Enable Samplerate',
+      name: 'enableSamplerate',
+      type: 'boolean',
+      defaultValue: 'false',
+      inputUI: {
+        type: 'switch',
+      },
+      tooltip:
+        'Toggle whether to enable setting audio samplerate',
+    },
+    {
+      label: 'Samplerate',
+      name: 'samplerate',
+      type: 'string',
+      defaultValue: '48k',
+      inputUI: {
+        type: 'text',
+        displayConditions: {
+          logic: 'AND',
+          sets: [
+            {
+              logic: 'AND',
+              inputs: [
+                {
+                  name: 'enableSamplerate',
+                  value: 'true',
+                  condition: '===',
+                },
+              ],
+            },
+          ],
+        },
+      },
+      tooltip:
+        'Specify the audio samplerate for newly added channels',
     },
   ],
   outputs: [
@@ -99,6 +178,11 @@ const attemptMakeStream = ({
   audioEncoder: string,
   wantedChannelCount: number,
 }): boolean => {
+  const enableBitrate = Boolean(args.inputs.enableBitrate);
+  const bitrate = String(args.inputs.bitrate);
+  const enableSamplerate = Boolean(args.inputs.enableSamplerate);
+  const samplerate = String(args.inputs.samplerate);
+
   const langMatch = (stream: IffmpegCommandStream) => (
     (langTag === 'und'
       && (stream.tags === undefined || stream.tags.language === undefined))
@@ -159,9 +243,19 @@ const attemptMakeStream = ({
   args.jobLog(`Adding ${langTag} stream in ${audioEncoder}, ${targetChannels} channels \n`);
 
   const streamCopy: IffmpegCommandStream = JSON.parse(JSON.stringify(streamWithHighestChannel));
+  streamCopy.removed = false;
   streamCopy.index = streams.length;
   streamCopy.outputArgs.push('-c:{outputIndex}', audioEncoder);
   streamCopy.outputArgs.push('-ac', `${targetChannels}`);
+
+  if (enableBitrate) {
+    const ffType = getFfType(streamCopy.codec_type);
+    streamCopy.outputArgs.push(`-b:${ffType}:{outputTypeIndex}`, `${bitrate}`);
+  }
+
+  if (enableSamplerate) {
+    streamCopy.outputArgs.push('-ar', `${samplerate}`);
+  }
 
   // eslint-disable-next-line no-param-reassign
   args.variables.ffmpegCommand.shouldProcess = true;
@@ -176,6 +270,8 @@ const plugin = (args: IpluginInputArgs): IpluginOutputArgs => {
   const lib = require('../../../../../methods/lib')();
   // eslint-disable-next-line @typescript-eslint/no-unused-vars,no-param-reassign
   args.inputs = lib.loadDefaultValues(args.inputs, details);
+
+  checkFfmpegCommandInit(args);
 
   const audioEncoder = String(args.inputs.audioEncoder);
   const langTag = String(args.inputs.language).toLowerCase();

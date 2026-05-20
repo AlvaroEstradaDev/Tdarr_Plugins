@@ -1,5 +1,24 @@
-import os from 'os';
+import fs from 'fs';
+import path from 'path';
 import { IpluginInputArgs } from './interfaces/interfaces';
+
+const getVaapiRenderDevice = (): string => {
+  const defaultDevice = '/dev/dri/renderD128';
+  try {
+    const driDir = '/dev/dri';
+    if (!fs.existsSync(driDir)) {
+      return defaultDevice;
+    }
+    const files = fs.readdirSync(driDir);
+    const renderDevices = files
+      .filter((f) => f.startsWith('renderD'))
+      .sort()
+      .map((f) => path.join(driDir, f));
+    return renderDevices.length > 0 ? renderDevices[0] : defaultDevice;
+  } catch (err) {
+    return defaultDevice;
+  }
+};
 
 export const hasEncoder = async ({
   ffmpegPath,
@@ -24,7 +43,7 @@ export const hasEncoder = async ({
       '-f',
       'lavfi',
       '-i',
-      'color=c=black:s=256x256:d=1:r=30',
+      'color=c=black:s=512x512:d=1:r=30',
       ...(filter ? filter.split(' ') : []),
       '-c:v',
       encoder,
@@ -186,10 +205,23 @@ export const getEncoder = async ({
   hardwareType: string,
   args: IpluginInputArgs,
 }): Promise<IgetEncoder> => {
+  const supportedGpuEncoders = ['hevc', 'h264', 'av1'];
+
   if (
     args.workerType
     && args.workerType.includes('gpu')
-    && hardwareEncoding && (['hevc', 'h264', 'av1'].includes(targetCodec))) {
+    && hardwareEncoding && (supportedGpuEncoders.includes(targetCodec))) {
+    const vaapiDevice = getVaapiRenderDevice();
+    const vaapiInputArgs = [
+      '-hwaccel',
+      'vaapi',
+      '-hwaccel_device',
+      vaapiDevice,
+      '-hwaccel_output_format',
+      'vaapi',
+    ];
+    const vaapiFilter = '-vf format=nv12,hwupload';
+
     const gpuEncoders: IgpuEncoder[] = [
       {
         encoder: 'hevc_nvenc',
@@ -197,6 +229,16 @@ export const getEncoder = async ({
         inputArgs: [
           '-hwaccel',
           'cuda',
+        ],
+        outputArgs: [],
+        filter: '',
+      },
+      {
+        encoder: 'hevc_rkmpp',
+        enabled: false,
+        inputArgs: [
+          '-hwaccel',
+          'rkmpp',
         ],
         outputArgs: [],
         filter: '',
@@ -214,25 +256,18 @@ export const getEncoder = async ({
         inputArgs: [
           '-hwaccel',
           'qsv',
+          '-hwaccel_output_format',
+          'qsv',
         ],
-        outputArgs: [
-          ...(os.platform() === 'win32' ? ['-load_plugin', 'hevc_hw'] : []),
-        ],
+        outputArgs: [],
         filter: '',
       },
       {
         encoder: 'hevc_vaapi',
-        inputArgs: [
-          '-hwaccel',
-          'vaapi',
-          '-hwaccel_device',
-          '/dev/dri/renderD128',
-          '-hwaccel_output_format',
-          'vaapi',
-        ],
+        inputArgs: vaapiInputArgs,
         outputArgs: [],
         enabled: false,
-        filter: '-vf format=nv12,hwupload',
+        filter: vaapiFilter,
       },
       {
         encoder: 'hevc_videotoolbox',
@@ -269,6 +304,18 @@ export const getEncoder = async ({
         inputArgs: [
           '-hwaccel',
           'qsv',
+          '-hwaccel_output_format',
+          'qsv',
+        ],
+        outputArgs: [],
+        filter: '',
+      },
+      {
+        encoder: 'h264_rkmpp',
+        enabled: false,
+        inputArgs: [
+          '-hwaccel',
+          'rkmpp',
         ],
         outputArgs: [],
         filter: '',
@@ -309,9 +356,9 @@ export const getEncoder = async ({
       {
         encoder: 'av1_vaapi',
         enabled: false,
-        inputArgs: [],
+        inputArgs: vaapiInputArgs,
         outputArgs: [],
-        filter: '',
+        filter: vaapiFilter,
       },
     ];
 
@@ -370,6 +417,18 @@ export const getEncoder = async ({
         isGpu: true,
         enabledDevices,
       };
+    }
+  } else {
+    if (!hardwareEncoding) {
+      args.jobLog('Hardware encoding is disabled in plugin input options');
+    }
+
+    if (!args.workerType || !args.workerType.includes('gpu')) {
+      args.jobLog('Worker type is not GPU');
+    }
+
+    if (!supportedGpuEncoders.includes(targetCodec)) {
+      args.jobLog(`Target codec ${targetCodec} is not supported for GPU encoding`);
     }
   }
 

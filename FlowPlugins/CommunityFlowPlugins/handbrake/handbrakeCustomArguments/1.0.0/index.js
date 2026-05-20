@@ -9,8 +9,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 var __generator = (this && this.__generator) || function (thisArg, body) {
-    var _ = { label: 0, sent: function() { if (t[0] & 1) throw t[1]; return t[1]; }, trys: [], ops: [] }, f, y, t, g;
-    return g = { next: verb(0), "throw": verb(1), "return": verb(2) }, typeof Symbol === "function" && (g[Symbol.iterator] = function() { return this; }), g;
+    var _ = { label: 0, sent: function() { if (t[0] & 1) throw t[1]; return t[1]; }, trys: [], ops: [] }, f, y, t, g = Object.create((typeof Iterator === "function" ? Iterator : Object).prototype);
+    return g.next = verb(0), g["throw"] = verb(1), g["return"] = verb(2), typeof Symbol === "function" && (g[Symbol.iterator] = function() { return this; }), g;
     function verb(n) { return function (v) { return step([n, v]); }; }
     function step(op) {
         if (f) throw new TypeError("Generator is already executing.");
@@ -55,6 +55,7 @@ var details = function () { return ({
     icon: '',
     inputs: [
         {
+            label: 'Custom Arguments',
             name: 'customArguments',
             type: 'string',
             defaultValue: '-Z "Fast 1080p30" --all-subtitles',
@@ -64,6 +65,7 @@ var details = function () { return ({
             tooltip: 'Specify HandBrake arguments',
         },
         {
+            label: 'JSON Preset',
             name: 'jsonPreset',
             type: 'string',
             defaultValue: '',
@@ -73,6 +75,7 @@ var details = function () { return ({
             tooltip: 'Paste a HandBrake JSON preset here. Leave blank to disable.',
         },
         {
+            label: 'Container',
             name: 'container',
             type: 'string',
             defaultValue: 'mkv',
@@ -89,7 +92,7 @@ var details = function () { return ({
                     'mpeg',
                 ],
             },
-            tooltip: 'Specify HandBrake arguments',
+            tooltip: 'Specify output container',
         },
     ],
     outputs: [
@@ -150,6 +153,7 @@ var plugin = function (args) { return __awaiter(void 0, void 0, void 0, function
                     inputFileObj: args.inputFileObj,
                     logFullCliOutput: args.logFullCliOutput,
                     updateWorker: args.updateWorker,
+                    args: args,
                 });
                 return [4 /*yield*/, cli.runCli()];
             case 4:

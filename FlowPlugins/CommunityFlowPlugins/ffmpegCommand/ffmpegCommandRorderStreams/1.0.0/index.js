@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.plugin = exports.details = void 0;
+var flowUtils_1 = require("../../../../FlowHelpers/1.0.0/interfaces/flowUtils");
 /* eslint no-plusplus: ["error", { "allowForLoopAfterthoughts": true }] */
 var details = function () { return ({
     name: 'Reorder Streams',
@@ -16,6 +17,7 @@ var details = function () { return ({
     icon: '',
     inputs: [
         {
+            label: 'Process Order',
             name: 'processOrder',
             type: 'string',
             defaultValue: 'codecs,channels,languages,streamTypes',
@@ -25,6 +27,7 @@ var details = function () { return ({
             tooltip: "Specify the process order.\nFor example, if 'languages' is first, the streams will be ordered based on that first.\nSo put the most important properties last.\nThe default order is suitable for most people.\n\n        \\nExample:\\n\n        codecs,channels,languages,streamTypes\n        ",
         },
         {
+            label: 'Languages',
             name: 'languages',
             type: 'string',
             defaultValue: '',
@@ -34,6 +37,7 @@ var details = function () { return ({
             tooltip: "Specify the language tags order, separated by commas. Leave blank to disable.\n        \\nExample:\\n\n        eng,fre\n        ",
         },
         {
+            label: 'Channels',
             name: 'channels',
             type: 'string',
             defaultValue: '7.1,5.1,2,1',
@@ -43,6 +47,7 @@ var details = function () { return ({
             tooltip: "Specify the channels order, separated by commas. Leave blank to disable.\n          \n          \\nExample:\\n\n          7.1,5.1,2,1",
         },
         {
+            label: 'Codecs',
             name: 'codecs',
             type: 'string',
             defaultValue: '',
@@ -52,6 +57,7 @@ var details = function () { return ({
             tooltip: "Specify the codec order, separated by commas. Leave blank to disable.\n          \n          \\nExample:\\n\n          aac,ac3",
         },
         {
+            label: 'Stream Types',
             name: 'streamTypes',
             type: 'string',
             defaultValue: 'video,audio,subtitle',
@@ -74,12 +80,13 @@ var plugin = function (args) {
     var lib = require('../../../../../methods/lib')();
     // eslint-disable-next-line @typescript-eslint/no-unused-vars,no-param-reassign
     args.inputs = lib.loadDefaultValues(args.inputs, details);
+    (0, flowUtils_1.checkFfmpegCommandInit)(args);
     var streams = JSON.parse(JSON.stringify(args.variables.ffmpegCommand.streams));
-    var originalStreams = JSON.stringify(streams);
     streams.forEach(function (stream, index) {
         // eslint-disable-next-line no-param-reassign
         stream.typeIndex = index;
     });
+    var originalStreams = JSON.stringify(streams);
     var sortStreams = function (sortType) {
         var items = sortType.inputs.split(',');
         items.reverse();

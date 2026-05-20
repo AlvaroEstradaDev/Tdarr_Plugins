@@ -1,3 +1,4 @@
+import { checkFfmpegCommandInit } from '../../../../FlowHelpers/1.0.0/interfaces/flowUtils';
 import {
   IffmpegCommandStream,
   IpluginDetails,
@@ -21,6 +22,7 @@ const details = (): IpluginDetails => ({
   icon: '',
   inputs: [
     {
+      label: 'Process Order',
       name: 'processOrder',
       type: 'string',
       defaultValue: 'codecs,channels,languages,streamTypes',
@@ -38,6 +40,7 @@ The default order is suitable for most people.
         `,
     },
     {
+      label: 'Languages',
       name: 'languages',
       type: 'string',
       defaultValue: '',
@@ -51,6 +54,7 @@ The default order is suitable for most people.
         `,
     },
     {
+      label: 'Channels',
       name: 'channels',
       type: 'string',
       defaultValue: '7.1,5.1,2,1',
@@ -64,6 +68,7 @@ The default order is suitable for most people.
           7.1,5.1,2,1`,
     },
     {
+      label: 'Codecs',
       name: 'codecs',
       type: 'string',
       defaultValue: '',
@@ -77,6 +82,7 @@ The default order is suitable for most people.
           aac,ac3`,
     },
     {
+      label: 'Stream Types',
       name: 'streamTypes',
       type: 'string',
       defaultValue: 'video,audio,subtitle',
@@ -104,14 +110,16 @@ const plugin = (args: IpluginInputArgs): IpluginOutputArgs => {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars,no-param-reassign
   args.inputs = lib.loadDefaultValues(args.inputs, details);
 
-  let streams: IffmpegCommandStream[] = JSON.parse(JSON.stringify(args.variables.ffmpegCommand.streams));
+  checkFfmpegCommandInit(args);
 
-  const originalStreams = JSON.stringify(streams);
+  let streams: IffmpegCommandStream[] = JSON.parse(JSON.stringify(args.variables.ffmpegCommand.streams));
 
   streams.forEach((stream, index) => {
     // eslint-disable-next-line no-param-reassign
     stream.typeIndex = index;
   });
+
+  const originalStreams = JSON.stringify(streams);
 
   const sortStreams = (sortType: {
     inputs: string,

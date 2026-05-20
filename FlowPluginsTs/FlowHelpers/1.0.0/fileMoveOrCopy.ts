@@ -1,4 +1,4 @@
-import { promises as fs } from 'fs';
+import { promises as fsp } from 'fs';
 
 import { getFileSize } from './fileUtils';
 import { IpluginInputArgs } from './interfaces/interfaces';
@@ -8,6 +8,14 @@ interface Imove {
     destinationPath:string,
     sourceFileSize:number,
     args:IpluginInputArgs,
+  }
+
+interface IFileMoveOrCopy {
+    operation: 'move' | 'copy',
+    sourcePath: string,
+    destinationPath: string,
+    args: IpluginInputArgs,
+    requireSourceDeletion?: boolean,
   }
 
 const getSizeBytes = async (fPath: string): Promise<number> => {
@@ -48,7 +56,7 @@ const tryMove = async ({
 
   let error = false;
   try {
-    await fs.rename(sourcePath, destinationPath);
+    await fsp.rename(sourcePath, destinationPath);
   } catch (err) {
     error = true;
     args.jobLog(`File move error: ${JSON.stringify(err)}`);
@@ -68,6 +76,7 @@ const tryMove = async ({
   return true;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const tryMvdir = async ({
   sourcePath,
   destinationPath,
@@ -156,7 +165,7 @@ const tryNormalCopy = async ({
 
   let error = false;
   try {
-    await fs.copyFile(sourcePath, destinationPath);
+    await fsp.copyFile(sourcePath, destinationPath);
   } catch (err) {
     error = true;
     args.jobLog(`File copy error: ${JSON.stringify(err)}`);
@@ -179,15 +188,21 @@ const tryNormalCopy = async ({
 const cleanSourceFile = async ({
   args,
   sourcePath,
+  requireSourceDeletion,
 }:{
     args:IpluginInputArgs,
     sourcePath: string,
-}) => {
+    requireSourceDeletion: boolean,
+}): Promise<void> => {
   try {
     args.jobLog(`Deleting source file ${sourcePath}`);
-    await fs.unlink(sourcePath);
+    await fsp.unlink(sourcePath);
   } catch (err) {
-    args.jobLog(`Failed to delete source file ${sourcePath}: ${JSON.stringify(err)}`);
+    const message = `Failed to delete source file ${sourcePath}: ${JSON.stringify(err)}`;
+    args.jobLog(message);
+    if (requireSourceDeletion) {
+      throw new Error(message);
+    }
   }
 };
 
@@ -196,16 +211,16 @@ const fileMoveOrCopy = async ({
   sourcePath,
   destinationPath,
   args,
-}: {
-    operation: 'move' | 'copy',
-    sourcePath: string,
-    destinationPath: string,
-    args: IpluginInputArgs,
-}):Promise<boolean> => {
+  requireSourceDeletion = false,
+}: IFileMoveOrCopy):Promise<boolean> => {
   args.jobLog('Calculating cache file size in bytes');
 
   const sourceFileSize = await getSizeBytes(sourcePath);
   args.jobLog(`${sourceFileSize}`);
+
+  if (sourceFileSize === 0) {
+    throw new Error(`Source file ${sourcePath} has size 0 or does not exist, aborting ${operation}`);
+  }
 
   if (operation === 'move') {
     const moved = await tryMove({
@@ -219,16 +234,17 @@ const fileMoveOrCopy = async ({
       return true;
     }
 
-    const mvdird = await tryMvdir({
-      sourcePath,
-      destinationPath,
-      args,
-      sourceFileSize,
-    });
+    // disable: https://github.com/HaveAGitGat/Tdarr/issues/885
+    // const mvdird = await tryMvdir({
+    //   sourcePath,
+    //   destinationPath,
+    //   args,
+    //   sourceFileSize,
+    // });
 
-    if (mvdird) {
-      return true;
-    }
+    // if (mvdird) {
+    //   return true;
+    // }
 
     args.jobLog('Failed to move file, trying copy');
   }
@@ -245,6 +261,7 @@ const fileMoveOrCopy = async ({
       await cleanSourceFile({
         args,
         sourcePath,
+        requireSourceDeletion,
       });
     }
 
@@ -263,6 +280,7 @@ const fileMoveOrCopy = async ({
       await cleanSourceFile({
         args,
         sourcePath,
+        requireSourceDeletion,
       });
     }
 

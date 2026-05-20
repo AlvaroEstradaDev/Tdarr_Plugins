@@ -6,6 +6,7 @@ import {
 } from '../../../../FlowHelpers/1.0.0/interfaces/interfaces';
 import { CLI } from '../../../../FlowHelpers/1.0.0/cliUtils';
 import { getFileName, getPluginWorkDir } from '../../../../FlowHelpers/1.0.0/fileUtils';
+import { checkFfmpegCommandInit } from '../../../../FlowHelpers/1.0.0/interfaces/flowUtils';
 
 /* eslint no-plusplus: ["error", { "allowForLoopAfterthoughts": true }] */
 const details = (): IpluginDetails => ({
@@ -62,11 +63,44 @@ const getOuputStreamTypeIndex = (streams: IffmpegCommandStream[], stream: Iffmpe
   return index;
 };
 
+const hasCodecOutputArg = (outputArgs: string[]): boolean => outputArgs.some((arg) => (
+  /^-(c|codec)(:|$)/.test(arg)
+  || /^-[vasd]codec(:|$)/.test(arg)
+));
+
+const isCopyCompatibleOutputOption = (arg: string): boolean => (
+  arg === '-metadata'
+  || arg.startsWith('-metadata:')
+  || arg === '-disposition'
+  || arg.startsWith('-disposition:')
+);
+
+const hasOnlyCopyCompatibleOutputArgs = (outputArgs: string[]): boolean => {
+  for (let i = 0; i < outputArgs.length; i += 1) {
+    const arg = outputArgs[i];
+
+    if (!isCopyCompatibleOutputOption(arg)) {
+      return false;
+    }
+
+    i += 1;
+  }
+
+  return true;
+};
+
+const shouldAddCopyCodec = (outputArgs: string[]): boolean => (
+  outputArgs.length === 0
+  || (!hasCodecOutputArg(outputArgs) && hasOnlyCopyCompatibleOutputArgs(outputArgs))
+);
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const plugin = async (args: IpluginInputArgs): Promise<IpluginOutputArgs> => {
   const lib = require('../../../../../methods/lib')();
   // eslint-disable-next-line @typescript-eslint/no-unused-vars,no-param-reassign
   args.inputs = lib.loadDefaultValues(args.inputs, details);
+
+  checkFfmpegCommandInit(args);
 
   const cliArgs: string[] = [];
 
@@ -91,6 +125,11 @@ const plugin = async (args: IpluginInputArgs): Promise<IpluginOutputArgs> => {
     return !stream.removed;
   });
 
+  if (streams.length === 0) {
+    args.jobLog('No streams mapped for new file');
+    throw new Error('No streams mapped for new file');
+  }
+
   for (let i = 0; i < streams.length; i += 1) {
     const stream = streams[i];
 
@@ -110,11 +149,11 @@ const plugin = async (args: IpluginInputArgs): Promise<IpluginOutputArgs> => {
 
     cliArgs.push(...stream.mapArgs);
 
-    if (stream.outputArgs.length === 0) {
+    if (shouldAddCopyCodec(stream.outputArgs)) {
       cliArgs.push(`-c:${getOuputStreamIndex(streams, stream)}`, 'copy');
-    } else {
-      cliArgs.push(...stream.outputArgs);
     }
+
+    cliArgs.push(...stream.outputArgs);
 
     inputArgs.push(...stream.inputArgs);
   }
@@ -163,6 +202,7 @@ const plugin = async (args: IpluginInputArgs): Promise<IpluginOutputArgs> => {
     inputFileObj: args.inputFileObj,
     logFullCliOutput: args.logFullCliOutput,
     updateWorker: args.updateWorker,
+    args,
   });
 
   const res = await cli.runCli();
@@ -173,6 +213,9 @@ const plugin = async (args: IpluginInputArgs): Promise<IpluginOutputArgs> => {
   }
 
   args.logOutcome('tSuc');
+
+  // eslint-disable-next-line no-param-reassign
+  args.variables.ffmpegCommand.init = false;
 
   return {
     outputFileObj: {

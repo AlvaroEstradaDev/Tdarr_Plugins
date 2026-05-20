@@ -1,6 +1,7 @@
 /* eslint no-plusplus: ["error", { "allowForLoopAfterthoughts": true }] */
 
 import { getContainer } from '../../../../FlowHelpers/1.0.0/fileUtils';
+import { checkFfmpegCommandInit } from '../../../../FlowHelpers/1.0.0/interfaces/flowUtils';
 import {
   IpluginDetails,
   IpluginInputArgs,
@@ -22,6 +23,7 @@ const details = (): IpluginDetails => ({
   icon: '',
   inputs: [
     {
+      label: 'Container',
       name: 'container',
       type: 'string',
       defaultValue: 'mkv',
@@ -35,15 +37,12 @@ const details = (): IpluginDetails => ({
       tooltip: 'Specify the container to use',
     },
     {
+      label: 'Force Conform',
       name: 'forceConform',
       type: 'boolean',
       defaultValue: 'false',
       inputUI: {
-        type: 'dropdown',
-        options: [
-          'false',
-          'true',
-        ],
+        type: 'switch',
       },
       tooltip: `
 Specify if you want to force conform the file to the new container,
@@ -65,6 +64,8 @@ const plugin = (args: IpluginInputArgs): IpluginOutputArgs => {
   const lib = require('../../../../../methods/lib')();
   // eslint-disable-next-line @typescript-eslint/no-unused-vars,no-param-reassign
   args.inputs = lib.loadDefaultValues(args.inputs, details);
+
+  checkFfmpegCommandInit(args);
 
   const newContainer = String(args.inputs.container);
   const { forceConform } = args.inputs;
@@ -95,11 +96,14 @@ const plugin = (args: IpluginInputArgs): IpluginOutputArgs => {
 
           if (newContainer === 'mp4') {
             if (
-              [
+              codecType === 'attachment'
+              || [
                 'hdmv_pgs_subtitle',
                 'eia_608',
                 'timed_id3',
                 'subrip',
+                'ass',
+                'ssa',
               ].includes(codecName)
             ) {
               stream.removed = true;
@@ -109,6 +113,18 @@ const plugin = (args: IpluginInputArgs): IpluginOutputArgs => {
           // Error
         }
       }
+    }
+    // handle genpts if coming from odd container
+    const container = args.inputFileObj.container.toLowerCase();
+    if (
+      [
+        'ts',
+        'avi',
+        'mpg',
+        'mpeg',
+      ].includes(container)
+    ) {
+      args.variables.ffmpegCommand.overallInputArguments.push('-fflags', '+genpts');
     }
   }
 

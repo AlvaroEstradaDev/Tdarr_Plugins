@@ -3,6 +3,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.plugin = exports.details = void 0;
 var fileUtils_1 = require("../../../../FlowHelpers/1.0.0/fileUtils");
+var flowUtils_1 = require("../../../../FlowHelpers/1.0.0/interfaces/flowUtils");
 /* eslint-disable no-param-reassign */
 var details = function () { return ({
     name: 'Set Container',
@@ -18,6 +19,7 @@ var details = function () { return ({
     icon: '',
     inputs: [
         {
+            label: 'Container',
             name: 'container',
             type: 'string',
             defaultValue: 'mkv',
@@ -31,15 +33,12 @@ var details = function () { return ({
             tooltip: 'Specify the container to use',
         },
         {
+            label: 'Force Conform',
             name: 'forceConform',
             type: 'boolean',
             defaultValue: 'false',
             inputUI: {
-                type: 'dropdown',
-                options: [
-                    'false',
-                    'true',
-                ],
+                type: 'switch',
             },
             tooltip: "\nSpecify if you want to force conform the file to the new container,\nThis is useful if not all streams are supported by the new container. \nFor example mkv does not support data streams.\n      ",
         },
@@ -57,6 +56,7 @@ var plugin = function (args) {
     var lib = require('../../../../../methods/lib')();
     // eslint-disable-next-line @typescript-eslint/no-unused-vars,no-param-reassign
     args.inputs = lib.loadDefaultValues(args.inputs, details);
+    (0, flowUtils_1.checkFfmpegCommandInit)(args);
     var newContainer = String(args.inputs.container);
     var forceConform = args.inputs.forceConform;
     if ((0, fileUtils_1.getContainer)(args.inputFileObj._id) !== newContainer) {
@@ -79,12 +79,15 @@ var plugin = function (args) {
                         }
                     }
                     if (newContainer === 'mp4') {
-                        if ([
-                            'hdmv_pgs_subtitle',
-                            'eia_608',
-                            'timed_id3',
-                            'subrip',
-                        ].includes(codecName)) {
+                        if (codecType === 'attachment'
+                            || [
+                                'hdmv_pgs_subtitle',
+                                'eia_608',
+                                'timed_id3',
+                                'subrip',
+                                'ass',
+                                'ssa',
+                            ].includes(codecName)) {
                             stream.removed = true;
                         }
                     }
@@ -93,6 +96,16 @@ var plugin = function (args) {
                     // Error
                 }
             }
+        }
+        // handle genpts if coming from odd container
+        var container = args.inputFileObj.container.toLowerCase();
+        if ([
+            'ts',
+            'avi',
+            'mpg',
+            'mpeg',
+        ].includes(container)) {
+            args.variables.ffmpegCommand.overallInputArguments.push('-fflags', '+genpts');
         }
     }
     return {
