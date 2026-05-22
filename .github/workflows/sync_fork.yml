@@ -19,6 +19,8 @@ jobs:
 
       - name: Sync with upstream
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           git remote add upstream https://github.com/HaveAGitGat/Tdarr_Plugins.git
           git fetch upstream
           git merge upstream/master --no-edit -X theirs || { git merge --abort; echo "::error::Merge conflict — manual sync required"; exit 1; }
