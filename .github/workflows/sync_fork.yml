@@ -12,7 +12,7 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: master
           fetch-depth: 0
@@ -21,5 +21,5 @@ jobs:
         run: |
           git remote add upstream https://github.com/HaveAGitGat/Tdarr_Plugins.git
           git fetch upstream
-          git merge upstream/master --no-edit -X theirs || git merge --abort && echo "::error::Merge conflict — manual sync required" && exit 1
+          git merge upstream/master --no-edit -X theirs || { git merge --abort; echo "::error::Merge conflict — manual sync required"; exit 1; }
           git push
